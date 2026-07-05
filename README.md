@@ -70,5 +70,4 @@ The system is designed to handle high-throughput, unpredictable AI API workloads
 5. **Execution** -> Strategy pattern invokes the specific provider (OpenAI, Claude, etc.).
 6. **Telemetry** -> Logs token usage and updates cost metrics asynchronously.
 
-## 📝 License
-This project is licensed under the MIT License.
+
