@@ -1,0 +1,32 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: ai-inference-gateway
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+ai:
+  providers:
+    openai:
+      api-key: ${OPENAI_API_KEY:dummy-key}
+      url: https://api.openai.com/v1
+    ollama:
+      url: http://localhost:11434/api
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      openai:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 3
+      ollama:
+        slidingWindowSize: 5
+        failureRateThreshold: 50
+        waitDurationInOpenState: 5s
+        permittedNumberOfCallsInHalfOpenState: 2
