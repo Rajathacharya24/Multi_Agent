@@ -14,6 +14,12 @@ ai:
     openai:
       api-key: ${OPENAI_API_KEY:dummy-key}
       url: https://api.openai.com/v1
+    anthropic:
+      api-key: ${ANTHROPIC_API_KEY:dummy-key}
+      url: https://api.anthropic.com/v1
+    gemini:
+      api-key: ${GEMINI_API_KEY:dummy-key}
+      url: https://generativelanguage.googleapis.com/v1beta
     ollama:
       url: http://localhost:11434/api
 
@@ -21,6 +27,16 @@ resilience4j:
   circuitbreaker:
     instances:
       openai:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 3
+      anthropic:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 3
+      gemini:
         slidingWindowSize: 10
         failureRateThreshold: 50
         waitDurationInOpenState: 10s
