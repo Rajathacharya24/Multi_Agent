@@ -28,31 +28,43 @@ public class GatewayService {
     private final TelemetryService telemetryService;
 
     public ChatResponse process(ChatRequest request) {
-        String model = request.getModel() != null ? request.getModel() : defaultModel(request.getProvider());
-        String cacheKey = buildCacheKey(request.getProvider(), model, request.getMessages().toString());
+        long startTime = System.currentTimeMillis();
+        String requestedProvider = request.getProvider() != null ? request.getProvider() : "openai";
+        String model = request.getModel() != null ? request.getModel() : defaultModel(requestedProvider);
+        String cacheKey = buildCacheKey(requestedProvider, model, request.getMessages().toString());
 
         // 1. Check cache
         Optional<ChatResponse> cached = cacheService.get(cacheKey);
         if (cached.isPresent()) {
+            long latency = System.currentTimeMillis() - startTime;
             ChatResponse hit = cached.get();
             hit.setCached(true);
+            telemetryService.record(request, hit, latency, false);
             return hit;
         }
 
         // 2. Attempt providers in fallback order
-        List<AiProvider> chain = router.getFallbackChain(request.getProvider());
+        List<AiProvider> chain = router.getFallbackChain(requestedProvider);
         RuntimeException lastException = null;
 
-        for (AiProvider provider : chain) {
+        for (int i = 0; i < chain.size(); i++) {
+            AiProvider provider = chain.get(i);
+            boolean isFallback = i > 0;
             try {
-                log.info("Trying provider: {}", provider.getName());
+                log.info("Trying provider: {} (fallback={})", provider.getName(), isFallback);
                 ChatResponse response = provider.chat(request);
+
+                // Ensure provider and model are set on response if missing
+                if (response.getProvider() == null) response.setProvider(provider.getName());
+                if (response.getModel() == null) response.setModel(model);
+
+                long latency = System.currentTimeMillis() - startTime;
 
                 // 3. Store in cache
                 cacheService.put(cacheKey, response);
 
                 // 4. Async telemetry
-                telemetryService.record(request, response);
+                telemetryService.record(request, response, latency, isFallback);
 
                 return response;
             } catch (Exception e) {
@@ -61,8 +73,11 @@ public class GatewayService {
             }
         }
 
-        throw new RuntimeException("All providers failed. Last error: " +
-                (lastException != null ? lastException.getMessage() : "unknown"), lastException);
+        long totalLatency = System.currentTimeMillis() - startTime;
+        String errorMsg = lastException != null ? lastException.getMessage() : "All AI providers unavailable";
+        telemetryService.recordError(request, errorMsg, totalLatency);
+
+        throw new RuntimeException("All providers failed. Last error: " + errorMsg, lastException);
     }
 
     private String defaultModel(String provider) {
